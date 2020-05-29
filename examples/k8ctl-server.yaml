@@ -1,0 +1,48 @@
+# Config file example
+# debug flag is enabled on the command line.
+
+# auth_path_prefix: param store path to authentication tokens
+#    example: /foo.com/prod/k8ctl-server/auth
+#    will evaluate by code to: /foo.com/prod/k8ctl-server/auth/:accessid/token
+#    where :accessID is first part of the Bearer token in the header.
+#           :accessID/<secret>
+#
+# health_route: the unique path for the health check route. Usually obuscated.
+# host_name: the host of the server. ex localhost; 0.0.0.0
+# jenkins_url: the http path to the webhook of the jenkins server.
+# jenkins_token_path_prefix: parameter store path to get the access token for the jenkins webhook.
+# namespaces: a list of namespaces this server supports. Exclude any that should not be used.
+# port: the IP port of the server. Usually 8080.
+# prof_port: when > 0, profiler access is enabled. Set to different port than server. ex: 8080
+# queue_send_delay: how long the queue should wait before sending the msg. N/A for Fifo queues?
+# queue_url: 	The full SQS http path in aws.
+# queue_timeout: how long to keep the msg unavailable for other workers. This is a psuedo lock.
+# queue_wait: how long to wait for the queue to return a new job. polling.
+# read_timeout: maximum duration for reading the entire request, including the body.
+# shutdown_wait: how long the signal trap should give the server time to shutdown before killing itself.
+# valid_apps_query_path: parameter store path to a string list of queryable apps/services re helm and kubectl
+# valid_apps_deploy_path: parameter store path to a string list of deployable chart names re helm
+# worker_poll_interval: how long the worker go routine should sleep between processing jobs.
+# write_timeout: maximum duration before timing out writes of the response.
+
+# Example:
+auth_path_prefix: /foo.com/east/cluster-1/k8ctl-server/auth
+health_route: /my-special-path/healthcheck
+host_name: 0.0.0.0
+jenkins_url: http://jenkins/generic-webhook-trigger/invoke:80
+jenkins_token_path_prefix: /foo.com/east/cluster-1/jenkins/webhook/token
+namespaces:
+- dev
+- qa
+port: 8080
+profiler_port: 0
+queue_send_delay: 10
+queue_url: 	https://sqs.us-east-1.amazonaws.com/12345/k8ctl-server-east-cluster-1.fifo
+queue_timeout: 10
+queue_wait: 4
+read_timeout: 10
+shutdown_wait: 30
+valid_apps_query_path: /foo.com/east/cluster-1/k8ctl-server/valid-apps/query
+valid_apps_deploy_path: /foo.com/east/cluster-1/k8ctl-server/valid-apps/deploy
+worker_poll_interval: 10
+write_timeout: 10
