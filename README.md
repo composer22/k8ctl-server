@@ -80,7 +80,11 @@ Run `go help` for more guidance, and visit <http://golang.org/> for tutorials, p
 
 ## Docker Image
 
-TBD
+```
+# To build
+ docker build --force-rm --no-cache --build-arg release_tag=1.0.0 -t composer22/k8ctl-server:1.0.0 .
+
+# Configure as needed via docker-entrypoint.sh
 
 ## License
 
