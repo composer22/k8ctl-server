@@ -10,26 +10,26 @@ import (
 
 // Options represents parameters that are passed to the application for launching the server.
 type Options struct {
-	AuthPathPrefix         string        `json:"authPathPrefix"`         // Path in ssm to locate user key for authentication. /<prefix>/:user/token/
-	ConfigPrefix           string        `json:"configPrefix"`           // Prefix of the config file name of the server.
-	Debug                  bool          `json:"debugEnabled"`           // Is debugging enabled for the server?
-	HealthRoute            string        `json:"healthRoute"`            // Obuscated route to the heathcheck of the server.
-	Hostname               string        `json:"hostName"`               // Hostname of the server.
-	JenkinsUrl             string        `json:"jenkinsUrl"`             // Endpoint to jenkins ingest webhook. This is within K8s.
-	JenkinsTokenPathPrefix string        `json:"jenkinsTokenPathPrefix"` // Path in ssm to retrieve the token to make API calls to Jenkins server.
-	Namespaces             []string      `json:"namespaces"`             // Namespaces this server manages.
-	Port                   int           `json:"port"`                   // HTTP api port of the server.
-	ProfPort               int           `json:"profPort"`               // The profiler port of the server.
-	QueueSendDelay         int           `json:"queueSendDelay"`         // How long to delay a send of a new message on the queue.
-	QueueUrl               string        `json:"queueUrl"`               // URL to the queue server.
-	QueueVisibilityTimeout int           `json:"queueTimeout"`           // How long the message should be hidden after receive.
-	QueueWaitTimeInSeconds int           `json:"queueWait"`              // How long to wait for a message to be available.
-	ReadTimeout            time.Duration `json:"readTimeout"`            // Server read request timeout.
-	ShutdownWait           time.Duration `json:"shutdownWait"`           // Shutdown wait time in seconds.
-	ValidAppsQueryPath     string        `json:"validAppsQueryPath"`     // Path in ssm to validate applications that can be queries by the server.
-	ValidAppsDeployPath    string        `json:"validAppsDeployPath"`    // Path in ssm to validate applications that can be deployed by the server.
-	WorkerPollInt          int           `json:"workerPoll"`             // Worker poll wait interval.
-	WriteTimeout           time.Duration `json:"writeTimeout"`           // Server write request timeout.
+	AuthPathPrefix         string        `json:"authPathPrefix"`      // Path in ssm to locate user key for authentication. /<prefix>/:user/token/
+	ConfigPrefix           string        `json:"configPrefix"`        // Prefix of the config file name of the server.
+	Debug                  bool          `json:"debugEnabled"`        // Is debugging enabled for the server?
+	HealthRoute            string        `json:"healthRoute"`         // Obuscated route to the heathcheck of the server.
+	Hostname               string        `json:"hostName"`            // Hostname of the server.
+	JenkinsUrl             string        `json:"jenkinsUrl"`          // Endpoint to jenkins ingest webhook. This is within K8s.
+	JenkinsTokenPath       string        `json:"jenkinsTokenPath"`    // Path in ssm to retrieve the token to make API calls to Jenkins server.
+	Namespaces             []string      `json:"namespaces"`          // Namespaces this server manages.
+	Port                   int           `json:"port"`                // HTTP api port of the server.
+	ProfPort               int           `json:"profPort"`            // The profiler port of the server.
+	QueueSendDelay         int           `json:"queueSendDelay"`      // How long to delay a send of a new message on the queue.
+	QueueUrl               string        `json:"queueUrl"`            // URL to the queue server.
+	QueueVisibilityTimeout int           `json:"queueTimeout"`        // How long the message should be hidden after receive.
+	QueueWaitTimeInSeconds int           `json:"queueWait"`           // How long to wait for a message to be available.
+	ReadTimeout            time.Duration `json:"readTimeout"`         // Server read request timeout.
+	ShutdownWait           time.Duration `json:"shutdownWait"`        // Shutdown wait time in seconds.
+	ValidAppsQueryPath     string        `json:"validAppsQueryPath"`  // Path in ssm to validate applications that can be queries by the server.
+	ValidAppsDeployPath    string        `json:"validAppsDeployPath"` // Path in ssm to validate applications that can be deployed by the server.
+	WorkerPollInt          int           `json:"workerPoll"`          // Worker poll wait interval.
+	WriteTimeout           time.Duration `json:"writeTimeout"`        // Server write request timeout.
 }
 
 // Factory function to create Option objects.
@@ -45,7 +45,7 @@ func (o *Options) FillConfig() {
 	o.HealthRoute = viper.GetString("health_route")
 	o.Hostname = viper.GetString("host_name")
 	o.JenkinsUrl = viper.GetString("jenkins_url")
-	o.JenkinsTokenPathPrefix = viper.GetString("jenkins_token_path_prefix")
+	o.JenkinsTokenPath = viper.GetString("jenkins_token_path")
 	o.Namespaces = viper.GetStringSlice("namespaces")
 	sort.Strings(o.Namespaces)
 	o.Port = viper.GetInt("port")

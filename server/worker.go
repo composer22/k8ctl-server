@@ -182,7 +182,7 @@ func (w *worker) deploy(body string) {
 	// Retrieve the Jenkin's token from AWS.
 	t, err := w.ssmsvc.GetParameter(
 		&ssm.GetParameterInput{
-			Name:           aws.String(w.opt.JenkinsTokenPathPrefix),
+			Name:           aws.String(w.opt.JenkinsTokenPath),
 			WithDecryption: aws.Bool(true),
 		})
 	if err != nil {
