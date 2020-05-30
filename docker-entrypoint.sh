@@ -20,8 +20,8 @@ mkdir -p -m 777 .aws
 mkdir -p -m 777 .kube
 
 # Render templates to config locations
-envtpl -o .aws/credentials -m error ./configmaps/aws-credentials/credentials
-envtpl -o .kube/config -m error ./configmaps/kubectl-config/config
+envtpl -o .aws/credentials -m error ./configmaps/aws-credentials
+envtpl -o .kube/config -m error ./configmaps/kubectl-config
 envtpl -o .k8ctl-server.yml -m error ./configmaps/k8ctl-server-config
 
 exec k8ctl-server start ${debug_flag}
