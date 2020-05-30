@@ -10,7 +10,7 @@
 # health_route: the unique path for the health check route. Usually obuscated.
 # host_name: the host of the server. ex localhost; 0.0.0.0
 # jenkins_url: the http path to the webhook of the jenkins server.
-# jenkins_token_path_prefix: parameter store path to get the access token for the jenkins webhook.
+# jenkins_token_path: parameter store path to get the access token for the jenkins webhook.
 # namespaces: a list of namespaces this server supports. Exclude any that should not be used.
 # port: the IP port of the server. Usually 8080.
 # prof_port: when > 0, profiler access is enabled. Set to different port than server. ex: 8080
@@ -27,10 +27,10 @@
 
 # Example:
 auth_path_prefix: /foo.com/east/cluster-1/k8ctl-server/auth
-health_route: /my-special-path/healthcheck
+health_route: /my-special-path/health
 host_name: 0.0.0.0
 jenkins_url: http://jenkins/generic-webhook-trigger/invoke:80
-jenkins_token_path_prefix: /foo.com/east/cluster-1/jenkins/webhook/token
+jenkins_token_path: /foo.com/east/cluster-1/jenkins/webhook/token
 namespaces:
 - dev
 - qa
