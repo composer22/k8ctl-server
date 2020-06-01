@@ -53,7 +53,7 @@ RUN apk --update-cache update \
   && sed -e s/\ *helm-${HELM_LATEST_VERSION}-linux-amd64.tar.gz//g -i helm.tar.gz.sha256.out \
   && diff helm.tar.gz.sha256.origin helm.tar.gz.sha256.out \
   && echo "====== Installing k8ctl-server ======" \
-  && mkdir -p /usr/local/docker/k8ctl-server \
+  && mkdir -p /usr/local/docker/k8ctl-server/configmaps \
   && curl -f -o /usr/local/docker/k8ctl-server/k8ctl-server \
       -L https://github.com/composer22/k8ctl-server/releases/download/${release_tag}/k8ctl-server-linux-amd64 \
   && echo "====== Final cleanup ======" \
