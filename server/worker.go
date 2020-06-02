@@ -54,10 +54,11 @@ func NewWorker(done chan bool, logr *logger.Logger, options *Options, sqsc *sqs.
 		MessageAttributeNames: []*string{
 			aws.String(sqs.QueueAttributeNameAll),
 		},
-		QueueUrl:          aws.String(options.QueueUrl),
+		QueueUrl:          &options.QueueUrl,
 		VisibilityTimeout: aws.Int64(int64(options.QueueVisibilityTimeout)),
 		WaitTimeSeconds:   aws.Int64(int64(options.QueueWaitTimeInSeconds)),
 	}
+
 	return &worker{
 		done:      done,
 		log:       logr,
@@ -88,8 +89,7 @@ func (w *worker) Run() {
 
 // Checks the queue and processes a request if available.
 func (w *worker) processQueue() {
-	// Pop from queue
-	job, err := w.sqssvc.ReceiveMessage(w.rcvParams) // TODO?
+	job, err := w.sqssvc.ReceiveMessage(w.rcvParams)
 	if err != nil {
 		w.log.Errorf("Receive message: %s", err.Error())
 		return

@@ -16,12 +16,14 @@ fi
 
 # we're in /usr/local/docker/k8ctl-server/
 
-mkdir -p -m 777 .aws
-mkdir -p -m 777 .kube
+mkdir -p -m 777 /root/.aws
+mkdir -p -m 777 /root/.kube
 
-# Render templates to config locations
-envtpl -o .aws/credentials -m error ./configmaps/aws-credentials
-envtpl -o .kube/config -m error ./configmaps/kubectl-config
+# Render and copy templates and configs to proper locations
+envtpl -o /root/.aws/credentials -m error ./configmaps/aws-credentials
+cp ./configmaps/aws-config /root/.aws/config
+
+envtpl -o /root/.kube/config -m error ./configmaps/kubectl-config
 envtpl -o .k8ctl-server.yml -m error ./configmaps/k8ctl-server-config
 
-exec k8ctl-server start ${debug_flag}
+exec ./k8ctl-server start ${debug_flag}

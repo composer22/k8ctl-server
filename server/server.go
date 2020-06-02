@@ -114,7 +114,6 @@ func (s *Server) Start() error {
 	}
 	s.sqssvc = sqs.New(sess) // Simple Queing Service
 	s.ssmsvc = ssm.New(sess) // Parameter Store
-
 	// Start the worker service which handles delete, deployments, rollbacks, restarts.
 	d := NewWorker(s.done, s.log, s.opt, s.sqssvc, s.ssmsvc, &s.wg)
 	go d.Run()
