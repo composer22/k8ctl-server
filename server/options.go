@@ -25,6 +25,7 @@ type Options struct {
 	QueueWaitTimeInSeconds int           `json:"queueWait"`           // How long to wait for a message to be available.
 	ReadTimeout            time.Duration `json:"readTimeout"`         // Server read request timeout.
 	ShutdownWait           time.Duration `json:"shutdownWait"`        // Shutdown wait time in seconds.
+	SlackUrl               string        `json:"slackUrl"`            // Url of the webhook to slack channel for reporting.
 	ValidAppsQueryPath     string        `json:"validAppsQueryPath"`  // Path in ssm to validate applications that can be queries by the server.
 	ValidAppsDeployPath    string        `json:"validAppsDeployPath"` // Path in ssm to validate applications that can be deployed by the server.
 	WorkerPollInt          int           `json:"workerPoll"`          // Worker poll wait interval.
@@ -55,6 +56,7 @@ func (o *Options) FillConfig() {
 	o.ReadTimeout = time.Duration(viper.GetInt("read_timeout")) * time.Second
 	o.ShutdownWait = time.Duration(viper.GetInt("shutdown_wait")) * time.Second
 	o.ValidAppsQueryPath = viper.GetString("valid_apps_query_path")
+	o.SlackUrl = viper.GetString("slack_url")
 	o.ValidAppsDeployPath = viper.GetString("valid_apps_deploy_path")
 	o.WorkerPollInt = viper.GetInt("worker_poll_interval")
 	o.WriteTimeout = time.Duration(viper.GetInt("write_timeout")) * time.Second

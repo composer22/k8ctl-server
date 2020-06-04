@@ -290,8 +290,9 @@ func (s *Server) releasesDeploy(c *gin.Context) {
 		return
 	}
 
+	user := c.GetString("user")
 	body, _ := json.Marshal(req)
-	if err = s.queueJob(req.Name, JobTypeDeploy, string(body)); err != nil {
+	if err = s.queueJob(req.Name, user, JobTypeDeploy, string(body)); err != nil {
 		s.log.Errorf("Queue: %s", err.Error())
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
@@ -343,7 +344,8 @@ func (s *Server) releaseDelete(c *gin.Context) {
 		return
 	}
 
-	if err := s.queueJob(name, JobTypeDelete, "{}"); err != nil {
+	user := c.GetString("user")
+	if err := s.queueJob(name, user, JobTypeDelete, "{}"); err != nil {
 		s.log.Errorf("Queue: %s", err.Error())
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
@@ -382,8 +384,9 @@ func (s *Server) releaseRollback(c *gin.Context) {
 		req.Revision = "0" // previous
 	}
 
+	user := c.GetString("user")
 	body, _ := json.Marshal(req)
-	if err := s.queueJob(name, JobTypeRollback, string(body)); err != nil {
+	if err := s.queueJob(name, user, JobTypeRollback, string(body)); err != nil {
 		s.log.Errorf("Queue: %s", err.Error())
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
@@ -443,8 +446,10 @@ func (s *Server) deploymentRestart(c *gin.Context) {
 		})
 		return
 	}
+
+	user := c.GetString("user")
 	body, _ := json.Marshal(req)
-	if err := s.queueJob(name, JobTypeRestart, string(body)); err != nil {
+	if err := s.queueJob(name, user, JobTypeRestart, string(body)); err != nil {
 		s.log.Errorf("Queue: %s", err.Error())
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
@@ -632,6 +637,20 @@ func (s *Server) validateAccess(c *gin.Context) {
 		})
 		return
 	}
+
+	// Let's try and get the user name and add it as an attribute to the request.
+	usr, err := s.ssmsvc.GetParameter(
+		&ssm.GetParameterInput{
+			Name:           aws.String(fmt.Sprintf("%s/%s/%s", s.opt.AuthPathPrefix, auth[0], ssmUserSubpath)),
+			WithDecryption: aws.Bool(false),
+		})
+
+	if err != nil {
+		c.Set("user", "unknown")
+	} else {
+		c.Set("user", aws.StringValue(usr.Parameter.Value))
+
+	}
 	c.Next()
 }
 
@@ -815,7 +834,7 @@ func (s *Server) executeCommand(cmd *exec.Cmd) (string, error) {
 // An alternative to rolling this bearcode might be to leverage:
 // https://github.com/RichardKnop/machinery
 // We add attributes to the message as metadata for later processing.
-func (s *Server) queueJob(name string, jobType int, payload string) error {
+func (s *Server) queueJob(name string, user string, jobType int, payload string) error {
 	sendParams := &sqs.SendMessageInput{
 		MessageDeduplicationId: aws.String(createV4UUID()),
 		MessageGroupId:         aws.String(applicationName),
@@ -829,6 +848,11 @@ func (s *Server) queueJob(name string, jobType int, payload string) error {
 			"Name": &sqs.MessageAttributeValue{
 				DataType:    aws.String("String"),
 				StringValue: aws.String(name),
+			},
+			// This is the username of the authorized user.
+			"User": &sqs.MessageAttributeValue{
+				DataType:    aws.String("String"),
+				StringValue: aws.String(user),
 			},
 		},
 		MessageBody: aws.String(payload), // json data from original request.

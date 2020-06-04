@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os/exec"
@@ -119,18 +120,19 @@ func (w *worker) processQueue() {
 	}
 
 	name := aws.StringValue(job.Messages[0].MessageAttributes["Name"].StringValue)
+	user := aws.StringValue(job.Messages[0].MessageAttributes["User"].StringValue)
 	payload := *job.Messages[0].Body
 
 	// Process payload.
 	switch jobType {
 	case JobTypeDelete:
-		w.delete(name)
+		w.delete(user, name)
 	case JobTypeDeploy:
-		w.deploy(payload)
+		w.deploy(user, payload)
 	case JobTypeRestart:
-		w.restart(name, payload)
+		w.restart(user, name, payload)
 	case JobTypeRollback:
-		w.rollback(name, payload)
+		w.rollback(user, name, payload)
 	default:
 		w.log.Errorf("Jobtype: %d", jobType)
 	}
@@ -142,14 +144,16 @@ func (w *worker) processQueue() {
 /************************************/
 
 // Delete a release.
-func (w *worker) delete(name string) {
+func (w *worker) delete(user string, name string) {
 	cmd := exec.Command("./scripts/helm-delete.sh", name)
 	result, err := execCmd(cmd)
 	if err != nil {
 		w.log.Errorf("helm-delete.sh: %s:%s", name, err.Error())
+		w.sendSlack("danger", user, "delete", name, ":ghost:", "", "*Error*: Could not delete release.")
 		return
 	}
 	w.log.Infof("Delete release %s %s", name, result)
+	w.sendSlack("good", user, "delete", name, ":thumbsup:", "", "*Success*: Release deleted.")
 }
 
 // Multilayered request to Jenkins.
@@ -170,12 +174,14 @@ type JenkinsPayload struct {
 }
 
 // Deploy a release.
-func (w *worker) deploy(body string) {
+func (w *worker) deploy(user string, body string) {
 	var req DeployRequest
 	if err := json.Unmarshal([]byte(body), &req); err != nil {
 		w.log.Errorf("Unmarshal release: %s error: %s", body, err.Error())
+		w.sendSlack("danger", user, "deploy", "(unknown target)", ":ghost:", "(unknown)", "*Error*: Could not Unmarshal request.")
 		return
 	}
+	name := fmt.Sprintf("%s:%s", req.Name, req.VersionTag)
 
 	// Call Jenkins
 
@@ -187,6 +193,7 @@ func (w *worker) deploy(body string) {
 		})
 	if err != nil {
 		w.log.Errorf("Unable to retrieve Jenkins token. Error: %s", err.Error())
+		w.sendSlack("danger", user, "deploy", name, ":ghost:", req.Namespace, "*Error*: Could not retrieve auth to Jenkins.")
 		return
 	}
 	token := aws.StringValue(t.Parameter.Value)
@@ -212,6 +219,7 @@ func (w *worker) deploy(body string) {
 	var out *http.Request
 	if out, err = http.NewRequest("POST", w.opt.JenkinsUrl, bytes.NewBuffer(payload)); err != nil {
 		w.log.Errorf("Could not create new request to jenkins: %s", err.Error())
+		w.sendSlack("danger", user, "deploy", name, ":ghost:", req.Namespace, "*Error*: Could not create request to Jenkins.")
 		return
 	}
 
@@ -226,6 +234,7 @@ func (w *worker) deploy(body string) {
 	var resp *http.Response
 	if resp, err = cl.Do(out); err != nil {
 		w.log.Errorf("Could not send a new request to jenkins: '%s'", err.Error())
+		w.sendSlack("danger", user, "deploy", name, ":ghost:", req.Namespace, "*Error*: Could not send request to Jenkins.")
 		return
 	}
 
@@ -233,6 +242,7 @@ func (w *worker) deploy(body string) {
 	var b []byte
 	if b, err = ioutil.ReadAll(resp.Body); err != nil {
 		w.log.Errorf("Could not read body of deploy response: %s", err.Error())
+		w.sendSlack("danger", user, "deploy", name, ":ghost:", req.Namespace, "*Error*: Could not read response from Jenkins.")
 		return
 	}
 	rbody := string(b)
@@ -240,18 +250,22 @@ func (w *worker) deploy(body string) {
 	// Validate the response.
 	if resp.StatusCode != http.StatusOK {
 		w.log.Errorf("Could not deploy %s:%s/%s - %n %s", req.Name, req.VersionTag, req.Namespace, resp.StatusCode, rbody)
+		w.sendSlack("danger", user, "deploy", name, ":ghost:", req.Namespace, "*Error*: Invalid response from Jenkins.")
 		return
 	}
 
 	w.log.Infof("Deploy release %s:%s/%s - %s", req.Name, req.VersionTag, req.Namespace, rbody)
+	w.sendSlack("good", user, "deploy", name, ":thumbsup:", req.Namespace, "*Success*: Release deployed to Jenkins.")
+
 }
 
 // Restart a deployment.
-func (w *worker) restart(name string, body string) {
+func (w *worker) restart(user string, name string, body string) {
 	var req RestartRequest
 	err := json.Unmarshal([]byte(body), &req)
 	if err != nil {
 		w.log.Errorf("Unmarshal %s %s %s", name, body, err.Error())
+		w.sendSlack("danger", user, "restart", name, ":ghost:", "(unknown)", "*Error*: Could not unmarshal request.")
 		return
 	}
 	cmd := exec.Command("./scripts/k8-restart.sh", name, req.Namespace)
@@ -259,17 +273,20 @@ func (w *worker) restart(name string, body string) {
 	result, err = execCmd(cmd)
 	if err != nil {
 		w.log.Errorf("k8-restart.sh: %s/%s %s", name, req.Namespace, err.Error())
+		w.sendSlack("danger", user, "restart", name, ":ghost:", req.Namespace, "*Error*: Could not restart.")
 		return
 	}
 	w.log.Infof("Restart deployment %s/%s : %s", name, req.Namespace, result)
+	w.sendSlack("good", user, "restart", name, ":thumbsup:", req.Namespace, "*Success*: Deployment restarted.")
 }
 
 // Rollback a release.
-func (w *worker) rollback(name string, body string) {
+func (w *worker) rollback(user string, name string, body string) {
 	var req RollbackRequest
 	err := json.Unmarshal([]byte(body), &req)
 	if err != nil {
 		w.log.Errorf("Rollback release %s: %s", name, err.Error())
+		w.sendSlack("danger", user, "rollback", name, ":ghost:", "", "*Error*: Could not unmarshal request.")
 		return
 	}
 
@@ -278,7 +295,43 @@ func (w *worker) rollback(name string, body string) {
 	result, err = execCmd(cmd)
 	if err != nil {
 		w.log.Errorf("k8-restart.sh: %s/%s %s", name, req.Revision, err.Error())
+		w.sendSlack("danger", user, "rollback", name, ":ghost:", "", fmt.Sprintf("*Error*: Could not rollback release %s.", req.Revision))
 		return
 	}
 	w.log.Infof("Rollback release %s/%s : %s", name, req.Revision, result)
+	w.sendSlack("good", user, "rollback", name, ":thumbsup:", "", fmt.Sprintf("*Success*: Release rolledback to %s", req.Revision))
+}
+
+// Send slack message
+func (w *worker) sendSlack(color string, user string, action string,
+	target string, icon string, namespace string, message string) {
+
+	// Optional namespace
+	var ns string
+	if namespace != "" {
+		ns = fmt.Sprintf("namespace: %s\n", namespace)
+	}
+
+	// Create the payload.
+	messageLong := fmt.Sprintf("%s/%s:\t%s %s\n%sresult: %s", user, action, target, icon, ns, message)
+	tmpl := `{"attachments": [{
+    "fallback": "%s",
+    "color": "%s",
+    "mrkdwn_in": ["text","fields"],
+    "text": "%s",
+     }]}`
+	payload := fmt.Sprintf(tmpl, message, color, messageLong)
+
+	// Send the request.
+	req, err := http.NewRequest(httpPost, w.opt.SlackUrl, bytes.NewBuffer([]byte(payload)))
+	if err != nil {
+		w.log.Errorf("Slack NewRequest: %s", err.Error())
+		return
+
+	}
+	cl := &http.Client{}
+	_, err = cl.Do(req)
+	if err != nil {
+		w.log.Errorf("Slack send msg: %s", err.Error())
+	}
 }
