@@ -2,7 +2,7 @@ package server
 
 const (
 	applicationName = "k8ctl-server" // Application name.
-	version         = "1.0.2"        // Application version.
+	version         = "1.0.3"        // Application version.
 
 	// Config file defaults (yml)
 	DefaultAuthPathPrefix         = "/k8ctl-server/auth"

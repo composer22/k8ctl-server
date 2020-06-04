@@ -3,8 +3,8 @@
 # Example for updating the parameter store:
 
 # AWS Creds
-aws ssm put-parameter --name "/your-company.com/k8ctl-server/aws/access_key_id" --value "AKIATP5GXF5KP5TBLWX6" --type SecureString
-aws ssm put-parameter --name "/your-company.com/k8ctl-server/aws/secret_access_key" --value "gtO7VyOkNwNsWUYmP46jCJmOalfVPBYxWmFROJTS" --type SecureString
+aws ssm put-parameter --name "/your-company.com/k8ctl-server/aws/access_key_id" --value "GUq0ts8M7rkptkka4em6JWmDKjAEQVdn" --type SecureString
+aws ssm put-parameter --name "/your-company.com/k8ctl-server/aws/secret_access_key" --value "EHhS37jbIme7B16" --type SecureString
 
 # User auth
 aws ssm put-parameter --name "/your-company.com/k8ctl-server/auth/DzmnNXfrMgTlv/token" --value "e7Do7X43PR6WcYPWKPf874SvEwvPJCA5" --type SecureString
