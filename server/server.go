@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -342,7 +343,7 @@ func (s *Server) releaseDelete(c *gin.Context) {
 		return
 	}
 
-	if err := s.queueJob(name, JobTypeDelete, ""); err != nil {
+	if err := s.queueJob(name, JobTypeDelete, "{}"); err != nil {
 		s.log.Errorf("Queue: %s", err.Error())
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
@@ -378,7 +379,7 @@ func (s *Server) releaseRollback(c *gin.Context) {
 
 	// Cleanup revision to default
 	if req.Revision == "" {
-		req.Revision = "previous"
+		req.Revision = "0" // previous
 	}
 
 	body, _ := json.Marshal(req)
@@ -816,12 +817,13 @@ func (s *Server) executeCommand(cmd *exec.Cmd) (string, error) {
 // We add attributes to the message as metadata for later processing.
 func (s *Server) queueJob(name string, jobType int, payload string) error {
 	sendParams := &sqs.SendMessageInput{
-		DelaySeconds: aws.Int64(int64(s.opt.QueueSendDelay)),
+		MessageDeduplicationId: aws.String(createV4UUID()),
+		MessageGroupId:         aws.String(applicationName),
 		MessageAttributes: map[string]*sqs.MessageAttributeValue{
 			// delete, deploy, restart, rollback
 			"JobType": &sqs.MessageAttributeValue{
-				DataType:    aws.String("Int"),
-				StringValue: aws.String(string(jobType)),
+				DataType:    aws.String("Number"),
+				StringValue: aws.String(strconv.Itoa(jobType)),
 			},
 			// This is the name of the release or deployment.
 			"Name": &sqs.MessageAttributeValue{

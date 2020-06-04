@@ -161,7 +161,7 @@ type JenkinsPayload struct {
 	Payload struct {
 		Pushdata struct {
 			Tag string `json:"tag"`
-		} `json:"pushdata"`
+		} `json:"push_data"`
 		Repository struct {
 			RepoName string `json:"repo_name"`
 		} `json:"repository"`
@@ -207,8 +207,7 @@ func (w *worker) deploy(body string) {
 	p.Payload.Pushdata.Tag = req.VersionTag
 	p.Payload.Repository.RepoName = req.Name
 	p.Payload.CallbackUrl = ""
-	pj, _ := json.Marshal(p)
-	payload := []byte(pj)
+	payload, _ := json.Marshal(p)
 
 	var out *http.Request
 	if out, err = http.NewRequest("POST", w.opt.JenkinsUrl, bytes.NewBuffer(payload)); err != nil {
@@ -230,12 +229,6 @@ func (w *worker) deploy(body string) {
 		return
 	}
 
-	// Decode the response.
-	if resp.StatusCode != http.StatusOK {
-		w.log.Errorf("Could not depoly %s:%s/%s - %s", req.Name, req.VersionTag, req.Namespace)
-		return
-	}
-
 	defer resp.Body.Close()
 	var b []byte
 	if b, err = ioutil.ReadAll(resp.Body); err != nil {
@@ -243,6 +236,13 @@ func (w *worker) deploy(body string) {
 		return
 	}
 	rbody := string(b)
+
+	// Validate the response.
+	if resp.StatusCode != http.StatusOK {
+		w.log.Errorf("Could not deploy %s:%s/%s - %n %s", req.Name, req.VersionTag, req.Namespace, resp.StatusCode, rbody)
+		return
+	}
+
 	w.log.Infof("Deploy release %s:%s/%s - %s", req.Name, req.VersionTag, req.Namespace, rbody)
 }
 
@@ -273,7 +273,7 @@ func (w *worker) rollback(name string, body string) {
 		return
 	}
 
-	cmd := exec.Command("./scripts/k8-restart.sh", name, req.Revision)
+	cmd := exec.Command("./scripts/helm-rollback.sh", name, req.Revision)
 	var result string
 	result, err = execCmd(cmd)
 	if err != nil {

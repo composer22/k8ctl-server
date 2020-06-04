@@ -14,7 +14,6 @@
 # namespaces: a list of namespaces this server supports. Exclude any that should not be used.
 # port: the IP port of the server. Usually 8080.
 # prof_port: when > 0, profiler access is enabled. Set to different port than server. ex: 8080
-# queue_send_delay: how long the queue should wait before sending the msg. N/A for Fifo queues?
 # queue_url: 	The full SQS http path in aws.
 # queue_timeout: how long to keep the msg unavailable for other workers. This is a psuedo lock.
 # queue_wait: how long to wait for the queue to return a new job. polling.
@@ -36,7 +35,6 @@ namespaces:
 - qa
 port: 8080
 profiler_port: 0
-queue_send_delay: 10
 queue_url: 	https://sqs.us-east-1.amazonaws.com/12345/k8ctl-server-east-cluster-1.fifo
 queue_timeout: 10
 queue_wait: 4

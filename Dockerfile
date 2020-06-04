@@ -62,6 +62,7 @@ RUN apk --update-cache update \
   && rm -rf /var/cache/apk/* /tmp/*
 
 COPY --from=envtpl /bin/envtpl /usr/local/bin/envtpl
+COPY ./scripts /usr/local/docker/k8ctl-server/scripts/
 COPY ./docker-entrypoint.sh  /usr/local/docker/k8ctl-server/docker-entrypoint.sh
 
 EXPOSE 8080

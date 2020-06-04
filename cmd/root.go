@@ -51,7 +51,6 @@ func initConfig() {
 	viper.SetDefault("host_name", server.DefaultHostname)
 	viper.SetDefault("port", server.DefaultPort)
 	viper.SetDefault("profiler_port", 0)
-	viper.SetDefault("queue_send_delay", server.DefaultQueueSendDelay)
 	viper.SetDefault("queue_timeout", server.DefaultQueueVisibilityTimeout)
 	viper.SetDefault("queue_wait", server.DefaultQueueWaitTimeInSeconds)
 	viper.SetDefault("read_timeout", server.DefaultReadTimeout)

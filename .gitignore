@@ -6,3 +6,4 @@ k8ctl-server-linux-amd64
 k8ctl-server-windows-amd64.exe
 **/.DS_Store
 aws-param-store-init.sh
+build-docker.sh

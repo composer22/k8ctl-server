@@ -20,7 +20,6 @@ type Options struct {
 	Namespaces             []string      `json:"namespaces"`          // Namespaces this server manages.
 	Port                   int           `json:"port"`                // HTTP api port of the server.
 	ProfPort               int           `json:"profPort"`            // The profiler port of the server.
-	QueueSendDelay         int           `json:"queueSendDelay"`      // How long to delay a send of a new message on the queue.
 	QueueUrl               string        `json:"queueUrl"`            // URL to the queue server.
 	QueueVisibilityTimeout int           `json:"queueTimeout"`        // How long the message should be hidden after receive.
 	QueueWaitTimeInSeconds int           `json:"queueWait"`           // How long to wait for a message to be available.
@@ -50,7 +49,6 @@ func (o *Options) FillConfig() {
 	sort.Strings(o.Namespaces)
 	o.Port = viper.GetInt("port")
 	o.ProfPort = viper.GetInt("profiler_port")
-	o.QueueSendDelay = viper.GetInt("queue_send_delay")
 	o.QueueUrl = viper.GetString("queue_url")
 	o.QueueVisibilityTimeout = viper.GetInt("queue_timeout")
 	o.QueueWaitTimeInSeconds = viper.GetInt("queue_wait")

@@ -8,7 +8,6 @@ const (
 	DefaultAuthPathPrefix         = "/k8ctl-server/auth"
 	DefaultHostname               = "localhost"
 	DefaultPort                   = 8080
-	DefaultQueueSendDelay         = 3
 	DefaultQueueVisibilityTimeout = 20
 	DefaultQueueWaitTimeInSeconds = 10
 	DefaultReadTimeout            = 10
@@ -72,17 +71,17 @@ const (
 	httpTrace  = "TRACE"
 
 	// Misc
-	JobTypeDelete = iota
-	JobTypeDeploy
-	JobTypeRestart
-	JobTypeRollback
+	JobTypeDelete   = 1 // iota didnt work as an int
+	JobTypeDeploy   = 2
+	JobTypeRestart  = 3
+	JobTypeRollback = 4
 
 	GuideTemplate = `
-This CLI tool provides a subset of commands to interact with a
+This CLI tool provides a subset of commands to interact with a server in a
 kubernetes cluster to control helm releases and kubernetes entities.
 
-Use "release" commands to control and view helm releases in a cluster.
-Such helm features as:
+Use  the "releases" commands to control and view helm releases in a cluster.
+Helm features:
 * delete
 * deploy
 * history
@@ -90,10 +89,10 @@ Such helm features as:
 * rollback
 * status
 
-Use "deployment" commands to list and view details on entities already in k8.
+Use the other commands to list and view details on entities already in k8.
 Such entities include:
 * cronjobs
-* deployments (incl restart)
+* deployments (includes a restart command)
 * ingresses
 * jobs
 * pods
@@ -104,10 +103,10 @@ Only the following namespaces are valid:
 Available Namespaces:
 {{range .Namespaces}}{{"* "}}{{.}}{{"\n"}}{{end}}
 
-A "release" deploy command must match one of these repo names:
+A "releases" deploy command must match one of these repo names:
 {{range .ValidAppsDeploy}}{{"* "}}{{.}}{{"\n"}}{{end}}
 
-Everything else requires one of these names to be apart of the name:
+Everything else requires one of these names to be a substring of the name:
 {{range .ValidAppsQuery}}{{"* "}}{{.}}{{"\n"}}{{end}}
 
 Known Issues:
