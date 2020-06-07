@@ -203,6 +203,8 @@ func (s *Server) configRoutes(r *gin.Engine) {
 	r.GET(httpRouteReleaseHistory, s.releaseHistory)
 
 	// Kubectl related
+	r.GET(httpRouteConfigmaps, s.handleList)
+	r.GET(httpRouteConfigmap, s.handleDetails)
 	r.GET(httpRouteCronjobs, s.handleList)
 	r.GET(httpRouteCronjob, s.handleDetails)
 	r.GET(httpRouteDeployments, s.handleList)
@@ -664,6 +666,10 @@ func (s *Server) getMetadata(c *gin.Context) {
 		resource, apiResource, apiVersion = "releases", "releases", httpRouteReleasesVersion
 	case httpRouteRelease, httpRouteReleaseRollback, httpRouteReleaseHistory:
 		resource, apiResource, apiVersion = "release", "releases", httpRouteReleasesVersion
+	case httpRouteConfigmaps:
+		resource, apiResource, apiVersion = "configmaps", "configmaps", httpRouteConfigmapsVersion
+	case httpRouteConfigmap:
+		resource, apiResource, apiVersion = "configmap", "configmaps", httpRouteConfigmapsVersion
 	case httpRouteCronjobs:
 		resource, apiResource, apiVersion = "cronjobs", "cronjobs", httpRouteCronjobsVersion
 	case httpRouteCronjob:

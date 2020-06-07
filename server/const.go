@@ -2,7 +2,7 @@ package server
 
 const (
 	applicationName = "k8ctl-server" // Application name.
-	version         = "1.0.3"        // Application version.
+	version         = "1.0.4"        // Application version.
 
 	// Config file defaults (yml)
 	DefaultAuthPathPrefix         = "/k8ctl-server/auth"
@@ -33,6 +33,8 @@ const (
 	httpRouteReleaseHistory  = "/releases/:name/history"  // Display the history of a release. (?e=environment)
 
 	// Kube related
+	httpRouteConfigmaps        = "/configmaps"                // Display a list of configmaps.
+	httpRouteConfigmap         = "/configmaps/:name"          // Display details of a configmap.
 	httpRouteCronjobs          = "/cronjobs"                  // Display a list of cronjobs.
 	httpRouteCronjob           = "/cronjobs/:name"            // Display details of a cronjob.
 	httpRouteDeployments       = "/deployments"               // Display a list of deployments.
@@ -53,6 +55,7 @@ const (
 
 	// API Versions
 	httpRouteReleasesVersion    = "v1.0.0"
+	httpRouteConfigmapsVersion  = "v1.0.0"
 	httpRouteCronjobsVersion    = "v1.0.0"
 	httpRouteDeploymentsVersion = "v1.0.0"
 	httpRouteIngressesVersion   = "v1.0.0"
@@ -91,7 +94,8 @@ Helm features:
 * status
 
 Use the other commands to list and view details on entities already in k8.
-Such entities include:
+Such as:
+* configmaps
 * cronjobs
 * deployments (includes a restart command)
 * ingresses
@@ -107,7 +111,7 @@ Available Namespaces:
 A "releases" deploy command must match one of these repo names:
 {{range .ValidAppsDeploy}}{{"* "}}{{.}}{{"\n"}}{{end}}
 
-Everything else requires one of these names to be a substring of the name:
+A "releases" delete, or rollback command, or a "deployments" restart command requires one of these names to be a substring of the name:
 {{range .ValidAppsQuery}}{{"* "}}{{.}}{{"\n"}}{{end}}
 
 Known Issues:
