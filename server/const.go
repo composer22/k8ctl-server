@@ -2,7 +2,7 @@ package server
 
 const (
 	applicationName = "k8ctl-server" // Application name.
-	version         = "1.0.5"        // Application version.
+	version         = "1.0.6"        // Application version.
 
 	// Config file defaults (yml)
 	DefaultAuthPathPrefix         = "/k8ctl-server/auth"
@@ -47,7 +47,7 @@ const (
 	httpRoutePods              = "/pods"                      // Display a list of running pods.
 	httpRoutePod               = "/pods/:name"                // Display details of a running pod.
 	httpRouteSecrets           = "/secrets"                   // Display a list of secrets.
-	httpRouteSecret            = "/secret/:name"              // Display details of a secret.
+	httpRouteSecret            = "/secrets/:name"             // Display details of a secret.
 	httpRouteServices          = "/services"                  // Display a list of running services.
 	httpRouteService           = "/services/:name"            // Display details of a running service.
 
