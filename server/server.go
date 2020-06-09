@@ -216,6 +216,8 @@ func (s *Server) configRoutes(r *gin.Engine) {
 	r.GET(httpRouteJob, s.handleDetails)
 	r.GET(httpRoutePods, s.handleList)
 	r.GET(httpRoutePod, s.handleDetails)
+	r.GET(httpRouteSecrets, s.handleList)
+	r.GET(httpRouteSecret, s.handleDetails)
 	r.GET(httpRouteServices, s.handleList)
 	r.GET(httpRouteService, s.handleDetails)
 
@@ -690,6 +692,10 @@ func (s *Server) getMetadata(c *gin.Context) {
 		resource, apiResource, apiVersion = "pods", "pods", httpRoutePodsVersion
 	case httpRoutePod:
 		resource, apiResource, apiVersion = "pod", "pods", httpRoutePodsVersion
+	case httpRouteSecrets:
+		resource, apiResource, apiVersion = "secrets", "secrets", httpRouteSecretsVersion
+	case httpRouteSecret:
+		resource, apiResource, apiVersion = "secret", "secrets", httpRouteSecretsVersion
 	case httpRouteServices:
 		resource, apiResource, apiVersion = "services", "services", httpRouteServicesVersion
 	case httpRouteService:
