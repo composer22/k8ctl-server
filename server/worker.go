@@ -258,7 +258,7 @@ func (w *worker) deploy(user string, body string) {
 	w.log.Infof("Deploy release %s:%s/%s - %s", req.Name, req.VersionTag, req.Namespace, rbody)
 	message := "*Success*: Release deployed to Jenkins."
 	if req.Memo != "" {
-		message += fmt.Sprintf("\nMemo: %s", req.Memo)
+		message += fmt.Sprintf("\nmemo: %s", req.Memo)
 	}
 	w.sendSlack("good", user, "deploy", name, ":thumbsup:", req.Namespace, message)
 
