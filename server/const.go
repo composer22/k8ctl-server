@@ -2,7 +2,7 @@ package server
 
 const (
 	applicationName = "k8ctl-server" // Application name.
-	version         = "1.0.7"        // Application version.
+	version         = "1.0.8"        // Application version.
 
 	// Config file defaults (yml)
 	DefaultAuthPathPrefix         = "/k8ctl-server/auth"
@@ -50,8 +50,9 @@ const (
 	httpRouteService           = "/services/:name"            // Display details of a running service.
 
 	// Other
-	httpRouteGuide         = "/guide"  // Get information on how to use this application from the server.
-	HttpRouteDefaultHealth = "/health" // Healthcheck. This is customizable so to obuscate the path. No header or auth is needed.
+	httpRouteGuide            = "/guide"             // Get information on how to use this application from the server.
+	HttpRouteDefaultHealth    = "/health"            // Healthcheck. This is customizable so to obuscate the path. No header or auth is needed.
+	httpRouteSlackInteractive = "/slack/interactive" // Slack response path for interactive services.
 
 	// API Versions
 	httpRouteReleasesVersion    = "v1.0.0"
@@ -64,6 +65,7 @@ const (
 	httpRouteServicesVersion    = "v1.0.0"
 	httpRouteGuideVersion       = "v1.0.0"
 	httpRouteHealthVersion      = "v1.0.0"
+	httpRouteSlackVersion       = "v1.0.0"
 
 	// Methods.
 	httpDelete = "DELETE"

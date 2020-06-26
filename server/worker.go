@@ -30,6 +30,7 @@ type worker struct {
 
 // Represents the payload of a request to deploy a chart.
 type DeployRequest struct {
+	Memo       string `json:"memo"`       // Optional text to display in slack etc.
 	Name       string `json:"name"`       // The application/chart name to deploy.
 	Namespace  string `json:"namespace"`  // The namespace to deploy.
 	VersionTag string `json:"versionTag"` // The docker version tag.
@@ -255,7 +256,11 @@ func (w *worker) deploy(user string, body string) {
 	}
 
 	w.log.Infof("Deploy release %s:%s/%s - %s", req.Name, req.VersionTag, req.Namespace, rbody)
-	w.sendSlack("good", user, "deploy", name, ":thumbsup:", req.Namespace, "*Success*: Release deployed to Jenkins.")
+	message := "*Success*: Release deployed to Jenkins."
+	if req.Memo != "" {
+		message += fmt.Sprintf("\nMemo: %s", req.Memo)
+	}
+	w.sendSlack("good", user, "deploy", name, ":thumbsup:", req.Namespace, message)
 
 }
 
