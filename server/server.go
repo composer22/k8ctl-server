@@ -314,6 +314,16 @@ func (s *Server) releasesDeploy(c *gin.Context) {
 		return
 	}
 
+	// Validate memo field. (Mandatory)
+	if req.Memo == "" {
+		s.log.Errorf("Memo is mandatory.")
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "A memo, such as a description or key words, is mandatory.",
+		})
+		return
+	}
+
 	user := c.GetString("user")
 	body, _ := json.Marshal(req)
 	if err = s.queueJob(req.Name, user, JobTypeDeploy, string(body)); err != nil {
