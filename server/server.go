@@ -304,7 +304,7 @@ func (s *Server) releasesDeploy(c *gin.Context) {
 
 	user := c.GetString("user")
 	body, _ := json.Marshal(req)
-	if err = s.queueJob(req.Name, user, JobTypeDeploy, string(body)); err != nil {
+	if err = s.queueJob(req.Name, user, JobTypeDeployInternal, string(body)); err != nil {
 		s.log.Errorf("Queue: %s", err.Error())
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
