@@ -7,6 +7,8 @@
 #    where :accessID is first part of the Bearer token in the header.
 #           :accessID/<secret>
 #
+# company_prefix: the prefix used in naming helm releases ex: fooco
+# git_repo: the git repo where helm charts reside.
 # health_route: the unique path for the health check route. Usually obuscated.
 # host_name: the host of the server. ex localhost; 0.0.0.0
 # image_tag_prefix: A prefix that must start the name of the image tag of a docker image.
@@ -20,9 +22,6 @@
 # queue_wait: how long to wait for the queue to return a new job. polling.
 # read_timeout: maximum duration for reading the entire request, including the body.
 # shutdown_wait: how long the signal trap should give the server time to shutdown before killing itself.
-# slack_api_token_path: parameter store path for the slack api token. Leave blank for disabling bot feature
-# slack_channel_ids: Channel IDs that the bot and this application will monitor and reply to.
-# slack_signing_secret_path: parameter store path to the slack signing token.
 # slack_url: webhook URL for slack messaging.
 # valid_apps_query_path: parameter store path to a string list of queryable apps/services re helm and kubectl
 # valid_apps_deploy_path: parameter store path to a string list of deployable chart names re helm
@@ -30,6 +29,8 @@
 # write_timeout: maximum duration before timing out writes of the response.
 # Example:
 auth_path_prefix: /foo.com/east/cluster-1/k8ctl-server/auth
+company_prefix: fooco
+git_repo: github.com/fooco/charts
 health_route: /my-special-path/health
 host_name: 0.0.0.0
 image_tag_prefix: m8isgreat-
@@ -45,11 +46,6 @@ queue_timeout: 10
 queue_wait: 4
 read_timeout: 10
 shutdown_wait: 30
-slack_api_token_path: /foo.com/east/cluster-1/k8ctl-server/slack/bottle-token
-slack_channel_ids:
-- ch1
-- ch8
-slack_signing_secret_path: /foo.com/east/cluster-1/k8ctl-server/slack/signer
 slack_url: https://hooks.slack.com/services/foo/bar
 valid_apps_query_path: /foo.com/east/cluster-1/k8ctl-server/valid-apps/query
 valid_apps_deploy_path: /foo.com/east/cluster-1/k8ctl-server/valid-apps/deploy

@@ -19,11 +19,6 @@ aws ssm put-parameter --name "/your-company.com/k8ctl-server/path-alive" --value
 # Slack Path
 aws ssm put-parameter --name "/your-company.com/k8ctl-server/path-slack" --value "Loo/dee/daaa" --type SecureString
 
-# Slack Classic API Token
-aws ssm put-parameter --name "/your-company.com/k8ctl-server/slack/user-token" --value "xoxp-meow" --type SecureString
-aws ssm put-parameter --name "/your-company.com/k8ctl-server/slack/bottle" --value "xoxb-purrrr" --type SecureString
-aws ssm put-parameter --name "/your-company.com/k8ctl-server/slack/signer" --value "grrrr" --type SecureString
-
 # Valid apps
 valid_apps_query="app1-server,app2-service,app2-website"
 valid_apps_deploy="app1-server,app2"

@@ -2,7 +2,7 @@ package server
 
 const (
 	applicationName = "k8ctl-server" // Application name.
-	version         = "1.0.10"       // Application version.
+	version         = "2.0.0"        // Application version.
 
 	// Config file defaults (yml)
 	DefaultAuthPathPrefix         = "/k8ctl-server/auth"
@@ -50,9 +50,8 @@ const (
 	httpRouteService           = "/services/:name"            // Display details of a running service.
 
 	// Other
-	httpRouteGuide            = "/guide"             // Get information on how to use this application from the server.
-	HttpRouteDefaultHealth    = "/health"            // Healthcheck. This is customizable so to obuscate the path. No header or auth is needed.
-	httpRouteSlackInteractive = "/slack/interactive" // Slack response path for interactive services.
+	httpRouteGuide         = "/guide"  // Get information on how to use this application from the server.
+	HttpRouteDefaultHealth = "/health" // Healthcheck. This is customizable so to obuscate the path. No header or auth is needed.
 
 	// API Versions
 	httpRouteReleasesVersion    = "v1.0.0"
@@ -65,7 +64,6 @@ const (
 	httpRouteServicesVersion    = "v1.0.0"
 	httpRouteGuideVersion       = "v1.0.0"
 	httpRouteHealthVersion      = "v1.0.0"
-	httpRouteSlackVersion       = "v1.0.0"
 
 	// Methods.
 	httpDelete = "DELETE"
@@ -77,10 +75,11 @@ const (
 	httpTrace  = "TRACE"
 
 	// Misc
-	JobTypeDelete   = 1 // iota didnt work as an int
-	JobTypeDeploy   = 2
-	JobTypeRestart  = 3
-	JobTypeRollback = 4
+	JobTypeDelete         = 1 // iota didnt work as an int
+	JobTypeDeploy         = 2
+	JobTypeDeployInternal = 3
+	JobTypeRestart        = 4
+	JobTypeRollback       = 5
 
 	GuideTemplate = `
 This CLI tool provides a subset of commands to interact with a server in a

@@ -2,6 +2,7 @@
 
 # Delete a release
 export name=$1
+export namespace=$2
 
-helm delete --purge "${name}"
+helm delete "${name}" --namespace "${namespace}"
 

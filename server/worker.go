@@ -28,6 +28,11 @@ type worker struct {
 	wg        *sync.WaitGroup          // Wait group for the run.
 }
 
+// Represents the payload of a request to restart a deployment.
+type DeleteRequest struct {
+	Namespace string `json:"namespace"` // The namespace to restart.
+}
+
 // Represents the payload of a request to deploy a chart.
 type DeployRequest struct {
 	Memo       string `json:"memo"`       // Optional text to display in slack etc.
@@ -43,7 +48,8 @@ type RestartRequest struct {
 
 // Represents the payload of a request to rollack a chart.
 type RollbackRequest struct {
-	Revision string `json:"revision"` // The revision to roll back to (optional)
+	Namespace string `json:"namespace"` // The namespace to rollback from.
+	Revision  string `json:"revision"`  // The revision to roll back to (optional)
 }
 
 // NewWorker is a factory function that returns a worker object.
@@ -122,14 +128,17 @@ func (w *worker) processQueue() {
 
 	name := aws.StringValue(job.Messages[0].MessageAttributes["Name"].StringValue)
 	user := aws.StringValue(job.Messages[0].MessageAttributes["User"].StringValue)
+	namespace := aws.StringValue(job.Messages[0].MessageAttributes["Namespace"].StringValue)
 	payload := *job.Messages[0].Body
 
 	// Process payload.
 	switch jobType {
 	case JobTypeDelete:
-		w.delete(user, name)
-	case JobTypeDeploy:
-		w.deploy(user, payload)
+		w.delete(user, name, payload)
+	// case JobTypeDeploy: (deprecated)
+	// 	w.deploy(user, payload)
+	case JobTypeDeployInternal:
+		w.deployInternal(user, payload)
 	case JobTypeRestart:
 		w.restart(user, name, payload)
 	case JobTypeRollback:
@@ -145,16 +154,24 @@ func (w *worker) processQueue() {
 /************************************/
 
 // Delete a release.
-func (w *worker) delete(user string, name string) {
-	cmd := exec.Command("./scripts/helm-delete.sh", name)
-	result, err := execCmd(cmd)
+func (w *worker) delete(user string, name string, body string) {
+	var req DeleteRequest
+	err := json.Unmarshal([]byte(body), &req)
 	if err != nil {
-		w.log.Errorf("helm-delete.sh: %s:%s", name, err.Error())
-		w.sendSlack("danger", user, "delete", name, ":ghost:", "", "*Error*: Could not delete release.")
+		w.log.Errorf("Unmarshal %s %s %s", name, body, err.Error())
+		w.sendSlack("danger", user, "delete", name, ":ghost:", "(unknown)", "*Error*: Could not unmarshal request.")
 		return
 	}
-	w.log.Infof("Delete release %s %s", name, result)
-	w.sendSlack("good", user, "delete", name, ":thumbsup:", "", "*Success*: Release deleted.")
+
+	cmd := exec.Command("./scripts/helm-delete.sh", name, req.Namespace)
+	result, err := execCmd(cmd)
+	if err != nil {
+		w.log.Errorf("helm-delete.sh: %s/%s %s", name, req.Namespace, err.Error())
+		w.sendSlack("danger", user, "delete", name, ":ghost:", req.Namespace, "*Error*: Could not delete release.")
+		return
+	}
+	w.log.Infof("Delete release %s/%s : %s", name, req.Namespace, result)
+	w.sendSlack("good", user, "delete", name, ":thumbsup:", req.Namespace, "*Success*: Release deleted.")
 }
 
 // Multilayered request to Jenkins.
@@ -174,7 +191,7 @@ type JenkinsPayload struct {
 	} `json:"payload"`
 }
 
-// Deploy a release.
+// Deploy a release. (deprecated)
 func (w *worker) deploy(user string, body string) {
 	var req DeployRequest
 	if err := json.Unmarshal([]byte(body), &req); err != nil {
@@ -264,6 +281,45 @@ func (w *worker) deploy(user string, body string) {
 
 }
 
+// Deploy a release. (internal)
+func (w *worker) deployInternal(user string, body string) {
+	var req DeployRequest
+	if err := json.Unmarshal([]byte(body), &req); err != nil {
+		w.log.Errorf("Unmarshal release: %s error: %s", body, err.Error())
+		w.sendSlack("danger", user, "deploy", "(unknown target)", ":ghost:", "(unknown)", "*Error*: Could not Unmarshal request.")
+		return
+	}
+	// Pretty format repo/app:imageid
+	name := fmt.Sprintf("%s:%s", req.Name, req.VersionTag)
+
+	// Sync git for helm charts.
+	cmd := exec.Command("./scripts/git-sync.sh", w.opt.GitRepo)
+	result, err := execCmd(cmd)
+	if err != nil {
+		w.log.Errorf("git-sync.sh: %s/%s %s", name, req.Namespace, err.Error())
+		w.sendSlack("danger", user, "deploy", name, ":ghost:", req.Namespace, "*Error*: Could not sync charts for the deploy.")
+		return
+	}
+
+	// Deploy the chart.
+	cmd := exec.Command("./scripts/helm-deploy.sh", req.Name, req.VersionTag, req.Namespace, w.opt.CompanyPrefix)
+	result, err := execCmd(cmd)
+	if err != nil {
+		w.log.Errorf("helm-deploy.sh: %s/%s - %s", name, req.Namespace, err.Error())
+		w.sendSlack("danger", user, "deploy", name, ":ghost:", req.Namespace, "*Error*: Could not deploy chart.")
+		return
+	}
+
+	// Final report.
+	w.log.Infof("Deploy release %s/%s - %s", name, req.Namespace, result)
+	message := "*Success*: Release deployed to k8."
+	if req.Memo != "" {
+		message += fmt.Sprintf("\nmemo: %s", req.Memo)
+	}
+	w.sendSlack("good", user, "deploy", name, ":thumbsup:", req.Namespace, message)
+
+}
+
 // Restart a deployment.
 func (w *worker) restart(user string, name string, body string) {
 	var req RestartRequest
@@ -295,16 +351,16 @@ func (w *worker) rollback(user string, name string, body string) {
 		return
 	}
 
-	cmd := exec.Command("./scripts/helm-rollback.sh", name, req.Revision)
+	cmd := exec.Command("./scripts/helm-rollback.sh", name, req.Revision, req.Namespace)
 	var result string
 	result, err = execCmd(cmd)
 	if err != nil {
-		w.log.Errorf("k8-restart.sh: %s/%s %s", name, req.Revision, err.Error())
-		w.sendSlack("danger", user, "rollback", name, ":ghost:", "", fmt.Sprintf("*Error*: Could not rollback release %s.", req.Revision))
+		w.log.Errorf("k8-restart.sh: %s/%s %s %s", name, req.Revision, req.Namespace, err.Error())
+		w.sendSlack("danger", user, "rollback", name, ":ghost:", req.Namespace, fmt.Sprintf("*Error*: Could not rollback release %s.", req.Revision))
 		return
 	}
-	w.log.Infof("Rollback release %s/%s : %s", name, req.Revision, result)
-	w.sendSlack("good", user, "rollback", name, ":thumbsup:", "", fmt.Sprintf("*Success*: Release rolledback to %s", req.Revision))
+	w.log.Infof("Rollback release %s/%s %s : %s", name, req.Revision, req.Namespace, result)
+	w.sendSlack("good", user, "rollback", name, ":thumbsup:", req.Namespace, fmt.Sprintf("*Success*: Release rolledback to %s", req.Revision))
 }
 
 // Send slack message

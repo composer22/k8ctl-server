@@ -2,7 +2,8 @@
 
 # Rollback a release
 export name=$1
-export revision=$2
+export namespace=$2
+export revision=$3
 
-helm rollback ${name} ${revision}
+helm rollback ${name} ${revision} --namespace "${namespace}"
 

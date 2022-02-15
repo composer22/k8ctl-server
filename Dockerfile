@@ -2,7 +2,8 @@
 FROM composer22/envtpl:latest AS envtpl
 
 # Server
-FROM alpine:latest
+#FROM alpine:latest
+FROM alpine:3.15.0
 ARG release_tag
 LABEL Name=k8ctl-server \
       Version=${release_tag}
@@ -11,16 +12,16 @@ ENV K8CTL_SERVER_RELEASE=${release_tag}
 
 # kubectl - Must be one version plus or minus EKS version.
 # https://docs.aws.amazon.com/eks/latest/userguide/install-kubectl.html
-ENV KUBE_LATEST_VERSION="1.16.8"
-ENV KUBE_LATEST_PATH="2020-04-16"
+ENV KUBE_LATEST_VERSION="1.19.6"
+ENV KUBE_LATEST_PATH="2021-01-05"
 
 # aws-iam-authenticator
 # https://docs.aws.amazon.com/eks/latest/userguide/install-aws-iam-authenticator.html
-ENV AUTH_LATEST_VERSION="1.16.8"
-ENV AUTH_LATEST_PATH="2020-04-16"
+ENV AUTH_LATEST_VERSION="1.21.2"
+ENV AUTH_LATEST_PATH="2021-07-05"
 
-# Helm - must be the same as the tiller on EKS if using 2.x
-ENV HELM_LATEST_VERSION="v2.13.1"
+# Helm - must be 3.x or greater
+ENV HELM_LATEST_VERSION="v3.8.0"
 
 # 1. Prepare alpine for installation.
 # 2. Add additional alpine packages.
@@ -32,7 +33,7 @@ ENV HELM_LATEST_VERSION="v2.13.1"
 
 RUN apk --update-cache update \
   && apk upgrade \
-  && apk add --upgrade bash ca-certificates curl gettext gzip openssl tar wget \
+  && apk add --upgrade bash ca-certificates curl gettext git gzip jq openssl tar wget \
   && cd /usr/local/bin \
   && echo "====== Installing kubectl ======" \
   && curl -o kubectl https://amazon-eks.s3-us-west-2.amazonaws.com/${KUBE_LATEST_VERSION}/${KUBE_LATEST_PATH}/bin/linux/amd64/kubectl \

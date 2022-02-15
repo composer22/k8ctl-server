@@ -6,10 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -28,7 +26,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/composer22/k8ctl-server/logger"
 	"github.com/gin-gonic/gin"
-	"github.com/slack-go/slack"
 )
 
 // Server - wrapper around the API server.
@@ -41,7 +38,6 @@ type Server struct {
 	router  *gin.Engine        // Represents the http router within the srvr.
 	running bool               // Is the server running?
 	sess    *session.Session   // AWS session for the run.
-	slack   *slackWorker       // Slack worker for handling RTM messaging.
 	sqssvc  *sqs.SQS           // AWS Simple Queuing Service connection.
 	srvr    *http.Server       // Customized HTTP server.
 	ssmsvc  *ssm.SSM           // AWS Parameter Store connection.
@@ -120,22 +116,10 @@ func (s *Server) Start() error {
 	s.sqssvc = sqs.New(sess) // Simple Queing Service
 	s.ssmsvc = ssm.New(sess) // Parameter Store
 
-	// Optional slack worker for handling RTM messaging and prompting for the deploy.
-	if s.opt.SlackAPITokenPath != "" {
-		s.slack, err = NewSlackWorker(s)
-		if err != nil {
-			return err
-		}
-	}
-
 	// Start the worker service which handles delete, deployments, rollbacks, restarts.
 	d := NewWorker(s.done, s.log, s.opt, s.sqssvc, s.ssmsvc, &s.wg)
 	go d.Run()
 
-	// Optionally start the slack worker.
-	if s.slack != nil {
-		go s.slack.Run()
-	}
 	// Pprof http endpoint for the profiler.
 	if s.opt.ProfPort > 0 {
 		s.StartProfiler()
@@ -185,10 +169,6 @@ func (s *Server) Shutdown() {
 	s.mu.Lock()
 	close(s.done) // Signal workers we are done.
 	s.wg.Wait()   // Wait for them to finish.
-
-	if s.slack != nil {
-		s.slack.RunDone() // Tell all slack channels we are exiting.
-	}
 	s.running = false
 	s.mu.Unlock()
 	s.log.Infof("End server service stop.")
@@ -242,8 +222,6 @@ func (s *Server) configRoutes(r *gin.Engine) {
 	// Other
 	r.GET(httpRouteGuide, s.guide) // extended dynamic help
 	r.GET(s.opt.HealthRoute, s.healthCheck)
-	r.POST(httpRouteSlackInteractive, s.slackInteractive)
-
 }
 
 /************************************/
@@ -278,7 +256,7 @@ func (s *Server) releasesList(c *gin.Context) {
 	})
 }
 
-// Deploy a new release.
+// Deploy a new helm release.
 func (s *Server) releasesDeploy(c *gin.Context) {
 	var req DeployRequest
 	var err error
@@ -341,11 +319,13 @@ func (s *Server) releasesDeploy(c *gin.Context) {
 	})
 }
 
-// Get a release status.
+// Get a helm release status.
 func (s *Server) releaseStatus(c *gin.Context) {
-	var format, result string
+	var namespace, format, result string
 	var err error
-
+	if namespace, err = s.validateNamespace(c, c.Query(httpParamNamespace)); err != nil {
+		return
+	}
 	if format, err = s.validateFormat(c); err != nil {
 		return
 	}
@@ -353,7 +333,7 @@ func (s *Server) releaseStatus(c *gin.Context) {
 	name := c.Param("name")
 
 	// Get the status of a release.
-	cmd := exec.Command("./scripts/helm-status.sh", name, format)
+	cmd := exec.Command("./scripts/helm-status.sh", name, namespace, format)
 	if result, err = execCmd(cmd); err != nil {
 		s.log.Errorf("helm-status.sh: %s %s", err.Error(), result)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
@@ -369,8 +349,19 @@ func (s *Server) releaseStatus(c *gin.Context) {
 	})
 }
 
-// Delete a release.
+// Delete a helm release.
 func (s *Server) releaseDelete(c *gin.Context) {
+	var req DeleteRequest
+	var err error
+	if err = c.ShouldBindJSON(&req); err != nil {
+		s.log.Errorf("JSON Bind: %s", err.Error())
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "Invalid JSON payload. Cannot be read.",
+		})
+		return
+	}
+
 	// Validate Name - approved apps only
 	name := c.Param("name")
 	resource := c.GetString("resource")
@@ -378,8 +369,14 @@ func (s *Server) releaseDelete(c *gin.Context) {
 		return
 	}
 
+	var namespace string
+	if namespace, err = s.validateNamespace(c, req.Namespace); err != nil {
+		return
+	}
+
 	user := c.GetString("user")
-	if err := s.queueJob(name, user, JobTypeDelete, "{}"); err != nil {
+	body, _ := json.Marshal(req)
+	if err := s.queueJob(name, user, JobTypeDelete, string(body)); err != nil {
 		s.log.Errorf("Queue: %s", err.Error())
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"status":  "error",
@@ -413,6 +410,11 @@ func (s *Server) releaseRollback(c *gin.Context) {
 		return
 	}
 
+	var namespace string
+	if namespace, err = s.validateNamespace(c, req.Namespace); err != nil {
+		return
+	}
+
 	// Cleanup revision to default
 	if req.Revision == "" {
 		req.Revision = "0" // previous
@@ -437,8 +439,12 @@ func (s *Server) releaseRollback(c *gin.Context) {
 
 // Get deployment history of a release.
 func (s *Server) releaseHistory(c *gin.Context) {
-	var format, result string
+	var format, namespace, result string
 	var err error
+	if namespace, err = s.validateNamespace(c, c.Query(httpParamNamespace)); err != nil {
+		return
+	}
+
 	if format, err = s.validateFormat(c); err != nil {
 		return
 	}
@@ -446,7 +452,7 @@ func (s *Server) releaseHistory(c *gin.Context) {
 	name := c.Param("name")
 
 	// Get the history of a release.
-	cmd := exec.Command("./scripts/helm-history.sh", name, format)
+	cmd := exec.Command("./scripts/helm-history.sh", name, namespace, format)
 	if result, err = execCmd(cmd); err != nil {
 		s.log.Errorf("helm-history.sh: %s %s", err.Error(), result)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
@@ -478,6 +484,11 @@ func (s *Server) deploymentRestart(c *gin.Context) {
 			"status":  "error",
 			"message": "Invalid JSON payload. Cannot be read.",
 		})
+		return
+	}
+
+	// Validate namespace
+	if _, err = s.validateNamespace(c, req.Namespace); err != nil {
 		return
 	}
 
@@ -557,7 +568,7 @@ func (s *Server) handleDetails(c *gin.Context) {
 type GuideData struct {
 	ValidAppsQuery  *[]string `json:"validAppsQuery"`  // List of valid apps for servicing
 	ValidAppsDeploy *[]string `json:"validAppsDeploy"` // List of valid apps for deploy
-	Namespaces      *[]string `json:"namespaces"`      //  List of valid namespaces for servicing
+	Namespaces      *[]string `json:"namespaces"`      // List of valid namespaces for servicing
 
 }
 
@@ -621,245 +632,6 @@ func (s *Server) healthCheck(c *gin.Context) {
 }
 
 /************************************/
-/********** SLACK HANDLING **********/
-/************************************/
-
-// Handles post requests from Slack for deploy processing.
-func (s *Server) slackInteractive(c *gin.Context) {
-
-	// No slack object? Then this route is disabled.
-	if s.slack == nil {
-		s.log.Errorf("Slack service is disabled in this server")
-		c.AbortWithStatusJSON(http.StatusNotFound, gin.H{
-			"status":  "error",
-			"message": "Route not found.",
-		})
-		return
-	}
-
-	// Validate the request signature
-
-	// Retrieve signing secret
-	t, err := s.ssmsvc.GetParameter(
-		&ssm.GetParameterInput{
-			Name:           aws.String(s.opt.SlackSigningSecretPath),
-			WithDecryption: aws.Bool(true),
-		})
-	if err != nil {
-		s.log.Errorf("Unable to retrieve signing secret. Error: %s", err.Error())
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
-			"message": "Unable to verify signature.",
-		})
-		return
-	}
-	signingSecret := aws.StringValue(t.Parameter.Value)
-
-	// Create secrets verifier
-	sv, err := slack.NewSecretsVerifier(c.Request.Header, signingSecret)
-	if err != nil {
-		s.log.Errorf("Failed to verify signing secret: %s", err.Error())
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-			"status":  "error",
-			"message": "Failed to verify signing secret.",
-		})
-		return
-	}
-
-	// Read body of request
-	defer c.Request.Body.Close()
-	b, err := ioutil.ReadAll(c.Request.Body)
-	if err != nil {
-		s.log.Errorf("Could not read body of request.")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
-			"message": "Unable to read body.",
-		})
-		return
-	}
-
-	// Verify secrets.
-	sv.Write(b) // Move body to verifier
-	if err := sv.Ensure(); err != nil {
-		s.log.Errorf("Failed to verify signing secret: %s", err.Error())
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-			"status":  "error",
-			"message": "Failed to verify signing secret.",
-		})
-		return
-	}
-
-	// Unescape the body content.
-	jsonStr, err := url.QueryUnescape(string(b)[8:])
-	if err != nil {
-		s.log.Errorf("Could not unescape body of request.")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
-			"message": "Unable to unescape body.",
-		})
-		return
-	}
-
-	// Unmarshal into struct.
-	var callback slack.InteractionCallback
-	err = json.Unmarshal([]byte(jsonStr), &callback)
-	if err != nil {
-		s.log.Errorf("Could not unmarshal body of request.")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
-			"message": "Unable to unmarshal body.",
-		})
-		return
-	}
-
-	// Validate the user is in the same team as the bot.
-	botinfo, err := s.slack.api.AuthTest()
-	if err != nil {
-		s.log.Errorf("Could not retrieve bot information.")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
-			"message": "Unable to retrieve account info.",
-		})
-		return
-	}
-	user, err := s.slack.api.GetUserInfo(callback.User.ID)
-	if user.TeamID != botinfo.TeamID {
-		s.log.Errorf("User is not on same team as bot.")
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-			"status":  "error",
-			"message": "User is not on team.",
-		})
-		return
-	}
-	// Validate the user can deploy.
-	if err := s.slack.validateUserAuth(callback.User.ID); err != nil {
-		s.log.Errorf("User is not authorized to deploy.")
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-			"status":  "error",
-			"message": "User is not authorized to deploy.",
-		})
-		return
-	}
-
-	// Now, handle the event.
-	if err := s.slackHandlerEvent(c, &callback, jsonStr); err != nil {
-		s.log.Errorf("slackHandlerEvent: %s", err.Error())
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
-			"status":  "error",
-			"message": "Internal error processing event.",
-		})
-	}
-	return
-}
-
-// slackHandlerEvent - main handler for the events from Slack.
-func (s *Server) slackHandlerEvent(c *gin.Context, message *slack.InteractionCallback, body string) error {
-	switch message.Type {
-	// Button or select option pressed?
-	case slack.InteractionTypeBlockActions:
-		if err := s.blockActionEvent(message); err != nil {
-			return err
-		}
-		// Process the message.
-		result := "OK"
-		c.JSON(http.StatusOK, gin.H{
-			"status":  "ok",
-			"message": result,
-		})
-
-	// Final view submission
-	case slack.InteractionTypeViewSubmission:
-		// Harvest and validate.
-		var namespace, repo, tag, memo string
-		if n, ok := message.View.State.Values["namespaceSelected"]["namespaceSelected"]; ok {
-			namespace = n.SelectedOption.Value
-		}
-		if r, ok := message.View.State.Values["repoSelected"]["repoSelected"]; ok {
-			repo = r.SelectedOption.Value
-		}
-		if t, ok := message.View.State.Values["imageTag"]["imageTag"]; ok {
-			tag = t.Value
-		}
-		if m, ok := message.View.State.Values["memo"]["memo"]; ok {
-			memo = m.Value
-		}
-		if err := s.validateDeployModal(c, tag); err != nil {
-			s.log.Errorf("validateDeployModal: %s", err.Error())
-			return nil // we handled this event w/ special message to modal.
-		}
-
-		// Send deploy job to processing queue.
-		req := &DeployRequest{
-			Memo:       memo,
-			Name:       repo,
-			Namespace:  namespace,
-			VersionTag: tag,
-		}
-		body, _ := json.Marshal(req)
-		if err := s.queueJob(req.Name, message.User.Name, JobTypeDeploy, string(body)); err != nil {
-			return errors.New(fmt.Sprintf("Queue: %s", err.Error()))
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"response_action": "clear",
-		})
-
-	}
-	return nil
-}
-
-// blockActionEvent - handles any block actions.
-func (s *Server) blockActionEvent(message *slack.InteractionCallback) error {
-	for _, a := range message.ActionCallback.BlockActions {
-		switch a.ActionID {
-		// Launch the modal form - get the key deploy data for submission.
-		case "start_01":
-			modalView, err := s.slack.deployModal()
-			if err != nil {
-				return err
-			}
-			_, err = s.slack.api.OpenView(message.TriggerID, modalView)
-			if err != nil {
-				return err
-			}
-			// Delete original launcher message.
-			_, _, err = s.slack.api.DeleteMessage(message.Channel.ID, message.Message.Timestamp)
-			if err != nil {
-				return err
-			}
-		case "cancel_01":
-			// Delete original launcher message.
-			if _, _, err := s.slack.api.DeleteMessage(message.Channel.ID, message.Message.Timestamp); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-// validateDeployModal - validates the modal dialog data returned for processing.
-// Returns error message if data is invalid.
-
-type SlackDeployErrResponse struct {
-	ResponseAction string `json:"response_action"`
-	Errors         struct {
-		NamespaceSelected string `json:"namespaceSelected,omitempty"`
-		RepoSelected      string `json:"repoSelected,omitempty"`
-		ImageTag          string `json:"imageTag,omitempty"`
-	} `json:"errors"`
-}
-
-func (s *Server) validateDeployModal(c *gin.Context, tag string) error {
-	if strings.HasPrefix(tag, s.opt.ImageTagPrefix) {
-		return nil
-	}
-	errMsg := &SlackDeployErrResponse{ResponseAction: "errors"}
-	errMsg.Errors.ImageTag = fmt.Sprintf("Image tag must begin with '%s'.", s.opt.ImageTagPrefix)
-	c.JSON(http.StatusOK, errMsg)
-	return errors.New(fmt.Sprintf("Invalid image tag: %s", tag))
-}
-
-/************************************/
 /********** MIDDLEWARE **************/
 /************************************/
 
@@ -877,8 +649,8 @@ func (s *Server) prepareResponseHeader(c *gin.Context) {
 
 // Authenticate access to the server.
 func (s *Server) validateAccess(c *gin.Context) {
-	// Healthcheck and Slack can be ignored. Slack will process with the message.
-	if (c.FullPath() == s.opt.HealthRoute) || (c.FullPath() == httpRouteSlackInteractive) {
+	// Healthcheck can be ignored.
+	if c.FullPath() == s.opt.HealthRoute {
 		c.Next()
 		return
 	}
@@ -968,8 +740,6 @@ func (s *Server) getMetadata(c *gin.Context) {
 		resource, apiResource, apiVersion = "guide", "guide", httpRouteGuideVersion
 	case s.opt.HealthRoute:
 		resource, apiResource, apiVersion = "health", "health", httpRouteHealthVersion
-	case httpRouteSlackInteractive:
-		resource, apiResource, apiVersion = "slack", "slack", httpRouteSlackVersion
 	default:
 		s.log.Errorf("Invalid Path: %s", c.Request.URL.Path)
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
@@ -988,7 +758,7 @@ func (s *Server) getMetadata(c *gin.Context) {
 
 // Authenticate mandatory header values.
 func (s *Server) validateHeader(c *gin.Context) {
-	// Healthcheck and Slack can be ignored. Slack will process with the message.
+	// Healthcheck can be ignored. Slack will process with the message.
 	if (c.FullPath() == s.opt.HealthRoute) || (c.FullPath() == httpRouteSlackInteractive) {
 		c.Next()
 		return
